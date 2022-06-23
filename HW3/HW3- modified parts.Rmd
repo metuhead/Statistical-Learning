@@ -1,0 +1,497 @@
+---
+title: "deneme"
+author: "M.Furkan Isik"
+date: "11/20/2021"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+
+
+a) Generate a new variable BTC1 which is the BTC return of the next day. Make sure that you sort the dataset according to "date." After sorting, you can remove "date" from your data set.
+
+
+
+```{r}
+btc=read.csv(file="/Users/metuhead/Desktop/FA590/HW3/BTCreturns.csv")
+head(btc)
+
+BTC_N= btc$BTC[2:nrow(btc)]
+btc= btc[1:nrow(btc)-1, ]
+btc$BTC_N=BTC_N
+
+head(btc)
+
+
+
+# Sorting the data by date 
+btc$Date= as.Date(btc$Date, format= "%m/%d/%Y")
+btc[order(btc$Date), ]
+
+# Excluding Date from the dataset
+df_btc= btc[, -1]
+
+
+head(df_btc)
+
+```
+
+
+
+
+Split your data set into 70% and 30%  training and testing datasets respectively.
+
+
+```{r}
+train= 1: (0.7 *nrow(df_btc) )
+df_btc_train= df_btc[train, ]
+df_btc_train
+df_btc_test= df_btc[-train, ]
+df_btc_test
+
+
+```
+
+
+
+
+
+(b) Perform boosting on the training set with 1,000 trees for a range of values of the shrinkage parameter λ. Hint: use the gbm package, the gbm() function with the option distribution=”Gaussian” to apply boosting to a regression problem.
+
+
+- Etherium seems to have more effect on BTN_N
+
+```{r}
+library(gbm)
+
+set.seed(708)
+MSE= c()
+
+for  ( i in  seq( from= 0.1, to= 1, by=0.05 ) ) {
+  
+
+boost.BTC_N =   gbm(BTC_N~., data= df_btc_train, distribution = "gaussian", n.trees = 1000,  interaction.depth = 2,shrinkage= i )
+yhat.boost = predict(boost.BTC_N, newdata = df_btc_test, n.trees = 1000 )
+curr_mse= mean((yhat.boost- df_btc_test[,"BTC_N"] )^2 )
+MSE= append( MSE, curr_mse )
+
+
+}
+
+
+
+MSE
+
+
+```
+
+
+
+
+
+
+
+(c) Produce a plot with different shrinkage values on the x-axis and the corresponding test set MSE on the y-axis.
+
+
+
+```{r}
+a=seq( from= 0.1, to= 1, by=0.05 )
+plot(x=a, y= MSE, type="l", xlab= "Shrinkage Values")
+```
+
+
+
+
+
+
+
+(d) Using the best shrinkage value, retrain your boosting model with the training dataset. What is the test set MSE for this approach?
+
+
+```{r}
+
+set.seed(708)
+
+
+which.min(MSE)
+
+best_shrikage= a[which.min(MSE)]
+
+
+
+boost.BTC_N =   gbm(BTC_N~., data= df_btc_train, distribution = "gaussian", n.trees = 1000,  interaction.depth = 2,shrinkage= best_shrikage )
+
+
+yhat.boost = predict(boost.BTC_N, newdata = df_btc_test, n.trees = 1000 )
+
+
+MSE_test=  mean((yhat.boost-df_btc_test[,"BTC_N"])^2 )
+MSE_test
+
+
+```
+
+
+
+
+
+(e) Apply bagging to the training set. What is the test set MSE for this approach?
+
+
+
+
+
+```{r}
+library(randomForest)
+set.seed(708)
+
+bag.tree= randomForest(BTC_N~., data= df_btc_train, mtry= 17, importance= TRUE)
+bag.tree
+
+summary(bag.tree)
+yhat.bag= predict(bag.tree, df_btc_test)
+
+
+MSE_bag_test= mean( (yhat.bag- df_btc_test[,"BTC_N"] )^2 )
+MSE_bag_test
+
+
+
+varImpPlot(bag.tree)
+
+
+```
+
+
+
+
+
+
+
+
+
+(f) Apply random forest to the training set. What is the test set MSE for this approach? Which variables appear to be the most important predictors in the random forest model?
+
+
+
+
+- Using random forest for regression 
+- Looking only subset of predictors
+
+```{r}
+
+library(rpart)
+
+bag.tree.rand= randomForest(BTC_N~., data= df_btc_train, mtry= 5, importance= TRUE)
+bag.tree.rand
+
+yhat.rand= predict(bag.tree.rand, df_btc_test)
+
+
+MSE_rand_test= mean( (yhat.rand- df_btc_test[,"BTC_N"] )^2 )
+MSE_rand_test
+
+
+
+
+plot(yhat.rand, df_btc_test[,"BTC_N"])
+
+
+abline(0,0)
+
+varImpPlot(bag.tree.rand)
+
+```
+
+
+
+
+
+
+```{r}
+varImpPlot(bag.tree.rand)
+```
+
+
+
+
+
+
+
+
+(g) Apply support vector machine to the training set. What is the test set MSE for this approach?
+
+
+
+
+
+
+
+```{r}
+library(e1071)
+sup.mod= svm(BTC_N~., df_btc_train,kernel="linear" )
+summary(sup.mod)
+sup.pred= predict(sup.mod, df_btc_test )
+
+
+# MAE for Test
+mean( abs(df_btc_test[,"BTC_N"] - sup.pred  ))
+
+# MSE for Test
+
+
+sup.mse= mean( (df_btc_test[,"BTC_N"] - sup.pred ) ^2 )
+paste( "MSE" , mean( (df_btc_test[,"BTC_N"] - sup.pred ) ^2 ) )
+
+
+
+
+```
+
+
+
+
+
+
+(h) Apply support vector machine with a nonlinear kernel to the training set. What is the test set MSE for this approach?
+
+
+
+```{r}
+
+sup.non_mod= svm(BTC_N~., df_btc_train,kernel="radial" )
+sup.non_pred= predict(sup.non_mod, df_btc_test)
+
+
+# MSE for test using nonlinear kernel
+sup.non_mse= mean(  (sup.non_pred -  df_btc_test[,"BTC_N"])^2  )
+sup.non_mse 
+paste ( "MSE" ,       mean(  (sup.non_pred -  df_btc_test[,"BTC_N"])^2   ) )
+
+
+```
+
+
+
+
+
+(i) Perform subset selection (your choice on how) in order to identify a satisfactory model that uses just a subset of the predictors (if your approach suggests using all of the predictors, then follow your results and use them all).I suggest that you use the function stepAIC.
+
+
+
+
+
+
+
+- According to Mallow's cp, model 4 is chosen, which has predictor as: BNDX , SMB, ETH_V , BTC_V
+
+
+```{r}
+library(leaps)
+sub.mod=  regsubsets(BTC_N~., data=df_btc_train)
+t(summary(sub.mod)$which)
+summary(sub.mod)$cp
+which.min(summary(sub.mod)$cp)
+
+
+```
+
+
+
+
+
+
+
+
+(j) Fit a GAM on the training data with this reduced dataset, using splines of each feature with 5 degrees of freedom.What is the test set MSE for this approach? What are the relevant nonlinear variables?
+
+
+
+- predictor as: BNDX , SMB, ETH_V , BTC_V
+
+```{r}
+
+library(gam)
+gam.mod =gam( BTC_N~ s(BNDX,df=5) +s(SMB, df=5) +s(ETH_V,df=5)   +     s(BTC_V,df=5), data= df_btc_train  )
+gam.mod
+par(mfrow=c(1,4))
+plot(gam.mod, se=TRUE, col= "blue")
+
+```
+
+
+
+
+
+
+- prediction using gam splines model
+
+
+```{r}
+gam.pred= predict(gam.mod, df_btc_test)
+gam.mse=  mean( (df_btc_test[,"BTC_N"]- gam.pred) ^2 )
+gam.mse
+
+
+```
+
+
+
+
+
+
+
+(k) Build a table to compare the test set MSE of your best model for:
+- Boosting
+- Bagging
+- Random Forests
+- Support vector machine
+- Support vector machine with nonlinear kernel
+- GAM
+
+
+```{r}
+MSE_test
+MSE_bag_test
+MSE_rand_test
+sup.mse
+sup.non_mse
+gam.mse
+
+
+
+df_com= data.frame(c(MSE_test,MSE_bag_test, MSE_rand_test, sup.mse,sup.non_mse, gam.mse))
+
+
+row.names(df_com)= c(" Boosting", " Bagging ", " Random Forrest", " Support Vector Classifier", "Support Vector Machine","Gam")
+colnames(df_com)= "Mean Squared Error"
+df_com
+```
+
+
+
+
+```{r}
+library(ISLR)
+
+head(Hitters)
+
+
+mod= lm(Salary~., data=Hitters)
+
+
+
+library(leaps)
+
+
+
+t( summary(regsubsets(Salary~., data=Hitters))$which )
+
+
+
+
+
+which.min(summary(regsubsets(Salary~., data=Hitters))$cp     )
+
+
+
+
+best.mod= lm(Salary~AtBat+ Hits+ Walks+ CHmRun+ CRuns+ CWalks + Division+ PutOuts    , data=Hitters)
+
+
+
+
+
+mean( ( predict(best.mod, Hitters) - Hitters$Salary)           ^2 )
+
+mean(na.omit(predict(best.mod, Hitters) - Hitters$Salary) )^2
+
+
+
+```
+
+
+
+
+```{r}
+
+mod.1= lm(Salary~ Hits+ Years, data= Hitters)
+
+
+mean(   (na.omit( predict(mod.1, Hitters)- Hitters$Salary ))^2 )
+
+
+```
+
+
+
+
+
+
+```{r}
+
+
+
+
+
+
+attach(Carseats)
+High <- factor(ifelse(Sales <= 8, "No", "Yes"))
+
+Carseats <- data.frame(Carseats , High)
+
+
+
+library(tree)
+tree.carseats = tree(High~ . - Sales, Carseats)
+
+
+
+plot(tree.carseats)
+
+text(tree.carseats)
+
+
+
+summary(tree.carseats)
+
+
+```
+
+
+
+
+
+
+
+```{r}
+# Cross Validation approach on tree method
+
+set.seed(21)
+cv.marketing=cv.tree(tree.opt, FUN= prune.misclass)
+names(cv.marketing)
+which.min ( cv.marketing$dev )
+
+
+```
+
+
+
+
+
+
+
+
+```{r}
+par(mfrow = c(1, 2))
+plot(cv.marketing$size , cv.marketing$dev, type = "b")
+plot(cv.marketing$k, cv.marketing$dev, type = "b")
+```
+
+
