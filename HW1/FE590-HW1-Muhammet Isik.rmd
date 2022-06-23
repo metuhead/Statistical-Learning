@@ -1,0 +1,284 @@
+---
+output:
+  word_document: default
+  pdf_document: default
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(warning=FALSE, message=FALSE)
+```
+
+
+
+# FE590.  Assignment #1.
+
+
+## `r format(Sys.time(), "%Y-%m-%d")`
+
+I pledge on my honor that I have not given or received any unauthorized assistance on this assignment/examination. I further pledge that I have not copied any material from a book, article, the Internet or any other source except where I have expressly cited the source.
+
+By filling out the following fields, you are signing this pledge.  No assignment will get credit without being pledged.
+
+Name: Muhammet Furkan Isik
+
+CWID: 10472193
+
+Date: 09/25/2021
+
+# Question 1
+
+## Question 1.1
+```{r}
+CWID = 10472193 #Place here your Campus wide ID number, this will personalize
+#your results, but still maintain the reproduceable nature of using seeds.
+#If you ever need to reset the seed in this assignment, use this as your seed
+#Papers that use -1 as this CWID variable will earn 0's so make sure you change
+#this value before you submit your work.
+personal = 10472193 %% 10000
+set.seed(personal)
+```
+Generate a vector `x` containing 10,000 realizations of a random normal variable with mean 1.0 and standard deviation 3.0, and plot a histogram of `x` using 100 bins.
+
+
+
+```{r}
+
+x= rnorm(n=10000, mean=1,sd=3)
+hist(x,breaks=100)
+
+```
+
+
+
+
+
+
+
+
+
+(Note that the following two fields can be added wherever you desire to show a solution.  You can use the first for a written response, and the second for showing R code and its output.  Some questions will require just one, and some both.  I will not always provide you with these, but you can add them at your discretion whereven necessary.  If it makes sense to do the R code first then that's fine.  If you want to include multiple of each, that's ok too.  Do what you feel is necessary to answer the question fully.)
+
+## \textcolor{red}{Solution:} 
+
+```{r}
+#response
+```
+
+
+## Question 1.2
+Calculate the mean and standard deviation of these 10000 values.  Do your answers make sense?
+
+## \textcolor{red}{Solution:}
+
+```{r}
+
+mean(x)
+sd(x)
+
+# Mean and the standard deviation of random variable X is quite close to one that we created above with mean=1, and sd=3
+
+```
+
+
+
+
+
+## Question 1.3
+Using the `sample` function, take out 10 random samples of 500 observations each (with replacement).  Create a vector of the means of each sample.  Calculate the mean of the sample means and the standard deviation of the sample means.  What do you observe about these results?
+
+## \textcolor{red}{Solution:}
+
+```{r}
+
+
+##  Mean of the sample means is very close to population mean, and sd of the sample means is 0.15
+
+sample= replicate(n=10,sample(x,500))
+mean_vector= colMeans(sample)
+mean(mean_vector)
+sd(mean_vector)
+
+```
+
+
+
+
+#Question 2
+
+##Question 2.1
+
+Create a script that creates a vector of the values from 1 to 100 using a for loop.
+
+## \textcolor{red}{Solution:}
+
+```{r}
+vec= vector()
+
+for (i in seq(from=1, to= 100)) {
+  
+  
+  vec= append(vec,i)
+  
+  
+}
+
+
+print(vec)
+
+```
+
+##Question 2.2
+
+Create a script that creates a vector of the values from 1 to 100 however you like (just make it different from the above approach)
+
+## \textcolor{red}{Solution:}
+
+```{r}
+a=1
+new_vec= c()
+
+while (a<=100) {
+  
+  new_vec= append(new_vec,a)
+  a=a+1
+  
+}
+
+new_vec
+
+```
+
+
+
+
+
+
+# Question 3
+Download and use the "obese.csv" file found under Modules section of Canvas. The data frame has 102 rows and 3 columns. It contains data from a random sample of Mexican-American adults in a small California town.
+
+
+
+
+```{r}
+data= read.csv("/Users/metuhead/Desktop/FA590/obese.csv")
+```
+
+
+## Question 3.0
+Find the mean and standard deviation of the variables 'obese' and  'bp' in this data set.  
+
+## \textcolor{red}{Solution:}
+
+```{r}
+mean(data$obese)
+mean(data$bp)
+sd(data$obese)
+sd(data$bp)
+
+
+
+
+
+```
+
+
+```{r}
+means= list(mean(data$obese), mean(data$bp))
+names(means) = c("obese_mean", "bp_mean")
+
+
+sds= list(sd(data$obese),   sd(data$bp))
+names(sds)= c("obese_sd", "bp_sd")
+
+
+print(c(means, sds))
+
+
+```
+
+
+
+
+
+
+
+
+## Question 3.1
+The variable `sex` is an integer code with 0 representing male and 1 representing female.  Use the `table` function operation on the variable `sex' to display how many men and women are represented in the sample.
+
+## \textcolor{red}{Solution:}
+
+```{r}
+
+table(data$sex)
+
+```
+
+
+
+## Question 3.2
+The `cut` function can convert a continuous variable into a categorical one.  Convert the blood pressure variable `bp` into a categorical variable called `bpc` with break points at 80, 120, and 240.  Rename the levels of `bpc` using the command `levels(bpc) <- c("low", "high")`.
+
+## \textcolor{red}{Solution:}
+
+```{r}
+bpc=cut(data$bp, breaks = c(80,120,240))
+levels(bpc)= c("low_bp", "high_bp")
+
+data$bpc= bpc
+
+bpc
+
+
+
+
+```
+
+## Question 3.3
+Use the `table` function to display a relationship between `sex` and `bpc`.
+
+## \textcolor{red}{Solution:}
+
+```{r}
+table(data$sex, data$bpc)
+```
+
+## Question 3.4
+Now cut the `obese` variable into a categorical variable `obesec` with break points 0, 1.25, and 2.5.  Rename the levels of `obesec` using the command `levels(obesec) <- c("low", "high")`.
+
+Use the `ftable` function to display a 3-way relationship between `sex`, `bpc`, and `obesec`.
+
+## \textcolor{red}{Solution:}
+
+```{r}
+
+obesec= cut(data$obese, breaks= c(0,1.25,2.5) )
+levels(obesec)= c("low_obs","high_obs")
+#obesec
+
+data$obesec= obesec
+
+
+ftable(data$sex, data$bpc,data$obesec)
+
+
+
+
+
+
+```
+
+Which group do you think is most at risk of suffering from obesity?  Why? (Note that the why is just as important as getting the group right.  This holds true for the course as a whole, not just this problem.)
+
+## \textcolor{red}{Solution:}
+
+```{r}
+
+
+# Comparing the genders, we can say that 1( female),  have  more obesity than males (0)
+
+# The group, who is most at risk is:  female(1) who have  high blood pressure because they have the highest obesity numbers among all the categories.
+
+```
+
+
