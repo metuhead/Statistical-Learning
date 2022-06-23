@@ -1,0 +1,1144 @@
+---
+output:
+  word_document: default
+  pdf_document: default
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(warning=FALSE, message=FALSE)
+```
+
+
+
+# FE590.  Assignment #2.
+
+
+## `r format(Sys.time(), "%Y-%m-%d")`
+
+
+I pledge on my honor that I have not given or received any unauthorized assistance on this assignment/examination. I further pledge that I have not copied any material from a book, article, the Internet or any other source except where I have expressly cited the source.
+
+By filling out the following fields, you are signing this pledge.  No assignment will get credit without being pledged.
+
+Name:Muhammet Furkan Isik
+
+CWID:10472193
+
+Date:10/21/2021
+
+
+# Instructions
+In this assignment, you should use R markdown to answer the questions below. Simply type your R code into embedded chunks as shown above.
+When you have completed the assignment, knit the document into a PDF file, and upload both the .pdf and .Rmd files to Canvas.
+```{r}
+CWID = 10472193 #Place here your Campus wide ID number, this will personalize
+#your results, but still maintain the reproduceable nature of using seeds.
+#If you ever need to reset the seed in this assignment, use this as your seed
+#Papers that use -1 as this CWID variable will earn 0's so make sure you change
+#this value before you submit your work.
+personal = CWID %% 10000
+set.seed(personal)#You can reset the seed at any time in your code,
+#but please always set it to this seed.
+```
+# Question 1 
+You are part of a research team of a FinTech company dedicated to forecast the price direction of public US companies. Using the attached dataset, select the company assigned to you according to your Stevens ID in the spreadsheet "assignments".
+
+You must build a forecasting model of your assigned company's next day's excess return (stock return  – risk free rate; ExRet) and its direction using the years 2014-2018 to train and 2019 to test your model. 
+
+The dataset is based on the Fama French 3 factor model:
+Rit−Rft=αit+β1(RMt−Rft)+β2SMBt+β3HMLt+ϵit
+
+where:
+Rit=total return of a stock or portfolio i at time t
+Rft=risk free rate of return at time t
+RMt=total market portfolio return at time t
+Rit−Rft=expected excess return
+RMt−Rft=excess return on the market portfolio (index)
+SMBt=size premium (small minus big)
+HMLt=value premium (high minus low)
+β1,2,3=factor coefficients
+
+The dataset includes the following variables or columns:
+Ticker: identifier of the stock
+Permno: permanent number of the stock
+Date: date of observation
+Alpha: Alpha of stock i
+b_mkt: Beta on mktrft
+b_smb: Beta on SMBt
+b_hml: Beta on HMLt
+ivol: Idiosyncratic Volatility: Variance of residuals or the part that cannot be explained by the Fama French model
+tvol: Total Volatility: Variance of stock returns
+Exret: Excess Return from Risk Model: stock return (price_t/price_(t-1)-1) – risk free rate
+
+For this exercise you do not need to know the details of the Fama French model. However, further details and data can be obtained at:
+http://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/f-f_factors.html
+https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html
+
+
+
+
+## 1.  Create a csv file with the information of the company assigned to you according to your Stevens ID in the tab "assignments" of the provided database. Read this csv file in R. Sort the variables by date in a new dataset. List the names of the variables in the dataset.
+
+```{r}
+# Importing raw data
+
+library(readxl)
+row_data <- read_excel("stocks100_2014_19.xlsx")
+```
+
+
+
+
+```{r}
+# Subsetting only MDT Ticker
+data= row_data[row_data$TICKER== "MDT", ]
+
+# Ordering the dataset  by date
+data= data[order(data$DATE), ]
+data= data[,c(2,1,3,4,5,6,7,8,9,10)]
+
+
+names(data)
+
+head(data)
+```
+
+
+## 2. Generate a new variable exret1 which is the excess return of the next day and exret_sq which is squared of exret. As the variables PERMNO, DATE and TICKER will be unimportant, remove those fields from your data frame.
+
+```{r}
+# Removing PERMNO, DATE and TICKER
+
+data= subset(data, select= - c(DATE, PERMNO, TICKER) )
+head(data)
+```
+
+
+```{r}
+
+# Creating exret1 variable
+e1= data[2: nrow(data), "exret"]
+
+# Creating exret_sq variable
+e2= e1^2
+
+
+# Merging e1 and e2
+e_1_2= cbind(e1,e2)
+colnames(e_1_2)= c("exret1", "exret_sq")
+
+
+# Adding them into the dataframe
+data= data[1:nrow(data)-1, ]
+
+
+data= cbind(data, e_1_2)
+
+head(data)
+
+
+
+```
+
+
+- Creating csv file for the data
+```{r}
+#write.csv(data, file="MDT CSV")
+```
+
+
+
+
+
+
+
+
+## 3. What is the range of each quantitative variable? Answer this question using the range() function with the sapply() function e.g., sapply(cars, range). Print a simple table of the ranges of the variables. The rows should correspond to the variables. The first column should be the lowest value of the corresponding variable, and the second column should be the maximum value of the variable. The columns should be suitably labeled.
+
+```{r}
+# Table for range data using sapply
+range_data= sapply(data,range)
+
+# transpose of data
+range_data= t(range_data)
+
+# Changing colnames
+colnames(range_data)= c("Min", "Max")
+#range_data
+
+# Converting it  into a dataframe 
+as.data.frame(range_data)
+
+```
+
+## 4. What is the mean and standard deviation of each variable? Create a simple table of the means and standard deviations.
+
+```{r}
+# Mean and Sd for each variable
+mean_data= sapply(data, mean)
+sd_data= sapply(data,sd)
+# Taking transpose
+t(mean_data)
+t(sd_data)
+# Creating a dataframe
+table= cbind(mean_data,sd_data)
+as.data.frame(table)
+
+```
+
+
+## 5.  Split your data into a 70% training set and a 30% testing set. Using the regsubsets function in the leaps library, regress next day excess return on the remaining variables only using the training sample.
+
+
+```{r}
+# Splitting the dataset
+
+# Creating training dataset 70%
+train= 0.7* nrow(data)
+train=round(train)
+
+
+data_train= data[1: train,  ]
+tail(data_train)
+
+
+# Creating test dataset 30%
+test= train+1
+data_test= data[test: nrow(data),]
+
+tail(data_test)
+
+```
+
+### a. Print a table showing what variables would be selected using best subset selection for all predictors of the training set. Determine the optimal model using Mallows' Cp and output the model, including its coefficients.
+
+```{r}
+# Best Subset Selection using training dataset
+library(leaps)
+ex.sub= regsubsets(exret~., data=data_train, nvmax=10)
+t(summary(ex.sub)$which)
+
+```
+
+
+
+![Mallow's Cp](/Users/metuhead/Desktop/FA590/HW2/SS/Screen Shot 2021-10-21 at 12.29.27 PM.png)
+
+
+
+- According to the Mallows' Cp Model 3 should be selected, which gives the minimum value
+
+```{r}
+## According to the Mallows' Cp Model 3 should be selected
+# Then our model is exret~ beta0 + b1*alpha + b2*exret1 + b3* exret_sq
+
+# Using Mallows' Cp to determine the best fitted model
+cp= summary(ex.sub)$cp
+cp
+
+
+# Choosing the minimum Mallow's value
+which.min(cp)
+
+
+
+#bic
+#bic=summary(ex.sub)$bic
+
+
+
+```
+
+
+
+- Then our model is exret~ beta0 + b1* alpha + b2* exret1 + b3* exret_sq
+- exret= -8.569053e-05 * beta0 +  2.072522e+00* alpha -9.578236e-02 * exret1  -1.411347e+00 * exret_sq
+
+```{r}
+# Then our model is exret~ beta0 + b1*alpha + b2*exret1 + b3* exret_sq
+# exret= -8.569053e-05 * beta0 +  2.072522e+00* alpha -9.578236e-02 *exret1  -1.411347e+00 * exret_sq
+
+cp_model= lm(exret~ alpha+exret1+ exret_sq, data=data_train)
+# summary(cp_model)$coefficients
+coef(cp_model)
+
+```
+
+
+
+
+
+
+
+
+### b. Print a table showing what variables would be selected using forward subset selection for all predictors of the training set. Determine the optimal model using BIC and output the model, including its coefficients.
+
+
+
+
+![Bayesian Information Criteria](/Users/metuhead/Desktop/FA590/HW2/SS/Screen Shot 2021-10-21 at 12.40.11 PM.png)
+
+
+
+
+
+
+
+
+```{r}
+# Used regsubset function and specified forward method to implement forward step wise implementation
+for.sub= regsubsets(exret~., data=data_train, nvmax=10,method = "forward")
+t(summary(for.sub)$which)
+
+```
+
+
+- Used BIC to come up with the model, according to BIC model with two predictors alpha1 and exret1 and constant term
+
+```{r}
+# Used BIC to come up with the model, according to BIC model with two predictors alpha1 and exret1 and constant term
+bic= summary(for.sub)$bic
+which.min(bic)
+
+```
+
+
+
+- coefficients   (Intercept) : -0.0002114784  alpha:  2.1030051398  exret1: -0.0868634902 
+
+```{r}
+# Model summary and coefficients   (Intercept) : -0.0002114784  alpha:  2.1030051398  exret1: -0.0868634902 
+bic_model= lm(exret~alpha+exret1,data=data_train)
+summary(bic_model)
+coef(bic_model)
+```
+
+
+
+
+### c. Print a table showing what variables would be selected using backward subset selection for all predictors of the training set. Determine the optimal model using adjusted R^2 and output the model, including its coefficients.
+
+
+
+![Adjusted R^2](/Users/metuhead/Desktop/FA590/HW2/SS/Screen Shot 2021-10-21 at 12.46.14 PM.png)
+
+
+
+
+
+```{r}
+# Used regsubset function and specified backward method to implement step wise implementation
+bac.sub= regsubsets(exret~., data= data_train, nvmax=10, method= "backward")
+t(summary(bac.sub)$which)
+
+```
+
+- Determined  the model by looking at the maximum r-squared value across different models which is model 8 using all variables
+
+```{r}
+## Determining the model by looking at the maximum r-squared value
+summary(bac.sub)$rsq
+which.max(summary(bac.sub)$rsq)
+
+```
+
+
+
+- Then our best model according to R-squared value is using all the variables  and coefficient as follows
+
+"
+(Intercept)         alpha         b_mkt         b_smb         b_hml          ivol          tvol        exret1 
+-3.571634e-03  2.504058e+00  4.890125e-03  5.988364e-03 -9.127282e-05  8.152261e-01 -6.265090e-01 -9.563937e-02 
+     exret_sq 
+-1.297810e+00 
+"
+
+
+
+```{r}
+# Then our best model according to R-squared value is using all the variables  and coefficient as follows
+
+"
+(Intercept)         alpha         b_mkt         b_smb         b_hml          ivol          tvol        exret1 
+-3.571634e-03  2.504058e+00  4.890125e-03  5.988364e-03 -9.127282e-05  8.152261e-01 -6.265090e-01 -9.563937e-02 
+     exret_sq 
+-1.297810e+00 
+"
+
+rsq.model= lm(exret~., data=data_train)
+#summary(rsq.model)
+coef(rsq.model)
+```
+
+
+
+
+
+
+
+## 6.a.  Using the training sample, fit a Ridge regression model with all the variables to forecast excess return.  Create a graph with the diferent values of lambda and the coefficients. Using the cv.glmnet function in the glmnet library, fit a Ridge regression model with a 10-fold cross-validation to choose the tuning parameter lambda. Print the value of the coefficients. Using the best lambda and the test sample, predict next day excess return and calculate the mean squared error.
+
+
+
+![Ridge Regression](/Users/metuhead/Desktop/FA590/HW2/SS/Screen Shot 2021-10-21 at 12.59.08 PM.png)
+
+
+
+
+
+
+
+
+```{r}
+# Fitting a ridge regression model using training dataset
+library(MASS)
+grid= 10^seq(7,-5, by= -.1)
+a= lm.ridge(exret~., data=data_train, lambda = grid)
+
+
+# Creating a graph with the diferent values of lambda and the coefficients
+leg.col= rainbow(dim(a$coef)[1])
+matplot(grid,t(a$coef), type= "l",lty=1,lwd=2, log = "x",col=leg.col, xlab="lambda", ylab="Normalized Coefficients")
+```
+
+
+
+-  Found  the Tuning parameter which is  -4.60517
+- Calculated mean squared error which is 8.489139e-05
+```{r}
+library(glmnet)
+x= model.matrix(exret~., data=data_train)[,-1]
+y= data_train$exret
+ridge.mod= glmnet(x,y,alpha = 0,lambda=grid)
+
+
+# 10-fold cross-validation to choose the tuning parameter lambda
+cv.out= cv.glmnet(x,y,alpha=0,lambda=grid)
+bestlam= cv.out$lambda.min
+
+# Finding the Tuning parameter which is  -4.60517
+log(bestlam)
+plot(cv.out$glmnet.fit,"lambda")
+plot(cv.out)
+
+
+
+# Predicting values using ridge regression
+bestrid.pred= predict(ridge.mod, s= bestlam,newx = x)
+
+
+# Calculating mean squared error which is 8.489139e-05
+mse_rid= mean((bestrid.pred- y)^2)
+mse_rid
+```
+
+
+- Predicted Coefficients
+```{r}
+# Prediciting Coefficients
+ridgecoef= glmnet(x,y,alpha=0,lambda = grid)
+predict(ridgecoef,type="coefficients", s= bestlam)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+### b. Fit a Lasso regression model with a 10-fold cross-validation to choose the tuning parameter lambda. Print the value of the coefficients. Using the best lambda and the test sample, predict next day excess return and calculate the mean squared error.
+
+
+![Lasso Regression](/Users/metuhead/Desktop/FA590/HW2/SS/Screen Shot 2021-10-21 at 1.07.19 PM.png)
+
+
+
+
+
+- Calculated tuning parameter which is -8.289306
+- Calculated mse value  which is 8.457083e-05
+- Predicted Coefficients
+
+```{r}
+# Fitting a lasso model
+lasso.mod= glmnet(x,y,alpha=1,lambda=grid)
+
+# 10-fold cross-validation to choose the tuning parameter lambda
+cv.out=cv.glmnet(x,y,alpha=1, lambda=grid)
+
+#plot(cv.out)
+bestlam=cv.out$lambda.min
+log(bestlam)
+
+
+# predicting excess return
+bestlas.pred= predict(lasso.mod, s=bestlam, newx=x)
+
+
+
+# Prediciting Coefficients
+lassocoef= glmnet(x,y,alpha=1,lambda = grid)
+predict(lassocoef,type="coefficients", s= bestlam)
+
+
+
+# mse using lasso, ,mse value is 8.457083e-05
+mean((bestlas.pred-y)^2)
+
+
+
+
+```
+
+
+
+
+
+
+### c. Compare and discuss the results of Lasso and Ridge regression indicating what approach you will choose and why.
+
+- Both Lasso and Ridge Regression gives very small Mean Squared Error, respectively 8.457083e-05, 8.471404e-05. 
+- Lasso uses  -8.059048 as tuning parameter, whereas  ridge uses -4.60517 as tuning parameters
+- It's wise to say that  lasso is better in this case,  since it shrinks the  coeffiecients exactly to zero which gives the model a good interpretation and makes it more simple 
+
+
+```{r}
+
+# Both Lasso and Ridge Regression gives very small Mean Squared Error, respectively 8.457083e-05, 8.471404e-05. 
+# Lasso uses  -8.059048 as tuning parameter, whereas  ridge uses -4.60517 as tuning parameters
+ 
+# it's wise to say that  lasso is better in this case,  since it shrinks to coeffiecients exactly to zero which gives the model a good interpretation and makes it more simple 
+
+```
+
+
+
+
+
+# Question 2 
+
+# Create another field "Direction" in this data frame that looks to the direction of the excess return of the next period (exret1), this direction should be listed as a factor, not a number. After "Direction" is created, exret1 should not be included in the dataset.
+  
+## 1. Using the training set, run LDA to forecast "Direction" on the training set.  Predict with the test sample. Calculate the confusion matrix and accuracy.
+
+
+
+```{r}
+
+# Adding Direction to the data, and assigning value 1 if exret1 >= 0 or 0 if exret<= 0
+
+data$Direction= 0
+
+for (i in seq(1: nrow(data) ) ) {
+
+if (data$exret1[i]>=0){
+  
+  
+  data$Direction[i]=1
+  
+  
+} else {
+  
+  
+  data$Direction[i]=0
+  
+}
+
+}
+
+
+# Setting direction as  factor 
+data$Direction= as.factor(data$Direction)
+
+table(data$Direction)
+
+
+```
+
+
+
+```{r}
+# Removing exret1 after Direction variable is created
+data= subset(data, select= -exret1)
+#head(data)
+
+
+# Updating test and training data as well
+data_train= data[1: train,  ]
+data_test= data[(train+1): nrow(data),  ]
+
+head(data_test)
+
+```
+
+- Created the confusion matrix
+- Calculated accuracy which is 0.5055188	
+
+```{r}
+
+# Fitting LDA for Direction on training dataset
+lda.fit= lda(Direction~.,data=data_train )
+#lda.fit
+
+
+# Predicting the direction using train data
+lda.pred_train= predict(lda.fit, data_train)
+lda.class_train= lda.pred_train$class
+
+# Confusing matrix using train Data
+#table(lda.class_train, data_train$Direction)
+# Accuracy using training data
+train_accur= mean(lda.class_train== data_train$Direction)
+
+
+
+# Predicting the direction with test sample
+lda.pred= predict(lda.fit,data_test)
+lda.class= lda.pred$class
+
+# Creating the Confusion Matrix
+table(lda.class,data_test$Direction)
+
+# Calculating accuracy
+test_accur= mean(lda.class== data_test$Direction)
+
+#(133+ 96) / (96+133+148 +76)
+
+
+## Model has higher accuracy using training data in comparison to test data( 0.5055188 )
+
+Accurcy_table= list("Train Accuracy "= train_accur, "Test Accuracy"=test_accur )
+
+data.frame(Accurcy_table)
+
+
+```
+
+
+
+
+
+
+## 2. Create code to determine the estimate of the expected test error of your model to forecast "Direction" using K=5 cross validation.  Do this by actually splitting the complete dataset into five pieces (can use function cut) and give the average of the test error, not just by using a command from a package.
+
+
+![K Fold Cross Validation](/Users/metuhead/Desktop/FA590/HW2/SS/Screen Shot 2021-10-21 at 1.32.37 PM.png)
+
+
+- Data split into 5 equal pieces
+
+```{r}
+
+# K Fold Cross Validation, used boot library
+
+
+# Splitting data into 5 equal pieces
+data_1= data[(1: (nrow(data)/5)), ]
+#tail(data_1)
+data_2= data[(nrow(data_1)+1):  (2*(nrow(data)/5)) , ]
+#tail(data_2)
+data_3= data[(2*(nrow(data)/5)+1):  (3*(nrow(data)/5)) , ]
+#tail(data_3)
+
+data_4= data[(3*(nrow(data)/5)):  (4*(nrow(data)/5)) , ]
+#tail(data_4)
+
+data_5= data[(4*(nrow(data)/5)):nrow(data) , ]
+tail(data_5)
+
+
+
+```
+
+
+-  The average of the test error is  0.505309 using using k fold cross validation where k=5
+```{r}
+
+# data_1 is the training set
+
+lda.data_1= lda(Direction~.,  data= rbind(data_2,data_3,data_4,data_5) )
+data_1.pred= predict(lda.data_1, newdata = data_1)
+err_1= mean(data_1.pred$class!=data_1$Direction)
+
+# data_2 is the test set
+
+lda.data_2= lda(Direction~.,  data= rbind(data_1,data_3,data_4,data_5) )
+data_2.pred= predict(lda.data_2, newdata = data_2)
+err_2= mean(data_2.pred$class!=data_2$Direction)
+
+
+
+# data_3 is the test set
+
+lda.data_3= lda(Direction~.,  data= rbind(data_1,data_2,data_4,data_5) )
+data_3.pred= predict(lda.data_3, newdata = data_3)
+err_3= mean(data_3.pred$class!=data_3$Direction)
+
+
+# data_4 is the test set
+
+lda.data_4= lda(Direction~.,  data= rbind(data_1,data_2,data_3,data_5) )
+data_4.pred= predict(lda.data_4, newdata = data_4)
+err_4= mean(data_4.pred$class!=data_4$Direction)
+
+
+# data_5 is the test set
+
+lda.data_5= lda(Direction~.,  data= rbind(data_1,data_2,data_3,data_4) )
+data_5.pred= predict(lda.data_5, newdata = data_5)
+err_5= mean(data_5.pred$class!=data_5$Direction)
+
+
+
+err_list= cbind(err_1,err_2,err_3,err_4,err_5)
+
+data.frame(err_list)
+
+
+
+# The average of the test error 0.505309
+mean(err_list)
+
+
+```
+
+
+
+
+
+
+
+
+
+
+## 3. Determine the LOOCV estimate of the expected test error of your model to forecast "Direction" using the complete dataset.  How do your answers to each part of this question compare?  Do you see any noticable differences between your answers?  Why do you think that is?
+
+
+![K Fold Cross Validation](/Users/metuhead/Desktop/FA590/HW2/SS/Screen Shot 2021-10-23 at 8.04.28 PM.png)
+
+
+
+
+
+
+
+# Mean error is by using LOOCV is 0.4910537 whereas mean error using K-fold is 0.505309 they are so close to each other
+
+# Obviously LOOCV takes more time than K-Fold to come up with MSE, since the number of folds equals to the number of observation -1
+
+# LOOCV can be subject to high variance or overfitting, as we are feeding the model almost all the training data to learn and just a single observation to evaluate.
+
+# K-Fold reduces the variance shown by LOOCV and introduces some bias by holding out a substantially large validation set.
+
+
+
+```{r}
+
+err_cont=c()
+#data
+for (i in 1:nrow(data)) {
+  train <- data[-i,]
+  test <- data[i,]
+  
+  lda.fit= lda(Direction~.,  data= train)
+  
+  
+  lda.pred= predict(lda.fit, test)
+  
+  lda.class=lda.pred$class
+  
+  
+  err= mean( lda.class!= test$Direction )
+  
+  err_cont= c(err_cont,err)
+  
+  
+}
+
+mean(err_cont)
+
+
+
+# Mean error is by using LOOCV is 0.4910537 whereas mean error using K-fold is 0.505309 they are so close to each other
+
+# Obviously LOOCV takes more time than K-Fold to come up with MSE
+
+# LOOCV can be subject to high variance or overfitting
+
+# K-Fold reduces the variance shown by LOOCV and introduces some bias by holding out a substantially large validation set.
+
+```
+
+# Question 3 
+
+### This question should be answered using the Weekly data set, which is part of the ISLR package. This data contains 1,089 weekly returns for 21 years, from the beginning of 1990 to the end of 2010.
+
+## 1. What does the data represent?
+
+
+- Data represents weekly return with lag values till 5 and Volume, and Direction
+- Min, Median and Quartiles values of the data represented in below
+
+
+
+```{r}
+# Data represents weekly return with lag values till 5 and Volume, and Direction
+# Min, Median and Quartiles values of the data represented in below
+library(ISLR)
+head(Weekly)
+summary(Weekly)
+
+```
+
+## 2. Use the full data set to perform a logistic regression with Direction as the response and the five lag variables plus Volume as predictors. Use the summary function to print the results. Do any of the predictors appear to be statistically significant? If so, which ones?
+
+
+- According to summary results, Yes some of the variables statistically significant.
+- Intercept and Lag value 2 values are significant, it could be also said that Lag 1(p-value 0.1181) is somewhat significant
+
+```{r}
+# According to summary results, Yes some of the variables statistically significant.
+# Intercept and Lag value 2 values are significant, it could be also said that Lag 1 is somewhat significant
+
+log.fit= glm(Direction~ Lag1+ Lag2 +Lag3 +Lag4 +Lag5+Volume, data=Weekly, family = binomial)
+summary(log.fit)
+
+coef(log.fit)
+
+# Predicting prob with given logistic regression model. type = "response" option tells R to output probabilities of the form P(Y = 1|X
+
+log.probs=predict(log.fit,type="response")
+
+log.probs[1:10]
+
+
+```
+
+
+## 3. Fit a logistic regression model using a training data period from 1990 to 2008, using the predictors from the previous problem that you determined were statistically significant. Test your model on the held out data (that is, the data from 2009 and 2010) and express its accuracy.
+
+
+- Accuracy is calculated which is  0.5769231
+
+```{r}
+# Training data creation
+Weekly_train= Weekly[Weekly["Year"] < 2009,]
+#tail(Weekly_train)
+
+# Test data creation
+Weekly_test= Weekly[Weekly["Year"] >= 2009,]
+#head(Weekly_test)
+# Fitting a logistic regression with predictors found significant in the model above, and used only  tranining data  
+log.fit_train= glm(Direction~Lag2+Lag1, data=Weekly_train, family=binomial)
+
+summary(log.fit_train)
+
+
+# Predicting values using training data
+
+weekly_prob_train= predict(log.fit_train,type="response")
+
+glm_pred_train= rep(0,985)
+glm_pred_train[weekly_prob_train>0.5]=1
+
+# Assigning 0 and 1 for the Direction Down and Up
+levels(Weekly_train$Direction)= c(0,1)
+
+# Creating Confusion Matrix for the training data
+#table(glm_pred_train,Weekly_train$Direction)
+
+# Calculating the accuracy
+#mean(glm_pred_train== Weekly_train$Direction)
+
+
+# Testing the model on testing data set
+weekly_prob= predict(log.fit_train,newdata = Weekly_test, type= "response")
+glm_pred= rep(0,104)
+glm_pred[weekly_prob>0.5]=1
+
+
+# Confusion Matrix
+table(glm_pred,Weekly_test$Direction )
+
+
+# Changing the level for Direction, 0 for Down, 1 for Up
+levels(Weekly_test$Direction)= c(0,1)
+
+# Confusion Matrix modified with only 0 and 1s
+table(glm_pred,Weekly_test$Direction )
+
+# Calculating the Accuracy
+## Accuracy is 0.5769231
+mean(glm_pred== Weekly_test$Direction)
+
+
+```
+
+## 4. Repeat Part 3 using LDA.
+
+- Calculated Accuracy which is 0.5769231
+
+```{r}
+library(MASS)
+
+# Fitting a Model Using Linear Discriminant Analysis
+lda.fit= lda(Direction~Lag2+Lag1, data= Weekly_train)
+lda.predict= predict(lda.fit, Weekly_test)
+
+lda.class= lda.predict$class
+
+
+# Creating a confusin matrix
+table(lda.class,Weekly_test$Direction )
+
+# Calculating the Accuracy
+## Accuracy is 0.5769231
+mean(lda.class== Weekly_test$Direction)
+
+```
+
+
+## 5. Repeat Part 3 using QDA.
+
+-  Calculated  Accuracy which is 0.5576923
+
+```{r}
+
+# Fitting a model using Quadratic Discriminant Analysis
+qda.fit= qda(Direction~Lag2+Lag1, data= Weekly_train)
+
+
+# Prediction Direction with QDA
+qda.predict= predict(qda.fit,Weekly_test)
+qda.class= qda.predict$class
+
+# Creating a confusin matrix
+table(qda.class, Weekly_test$Direction)
+
+
+# Calculating the Accuracy
+## Accuracy is 0.5576923
+mean(qda.class== Weekly_test$Direction)
+
+
+```
+
+## 6. Repeat Part 3 using KNN with K = 1, 2, 3.
+
+- K=1,Calculated the  Accuracy which  is 0.4807692
+
+- K=2,Calculated the Accuracy which  is 0.4615385
+
+- K=3, Calculated the  Accuracy which  is 0.5192308
+
+```{r}
+library(class)
+
+## Fitting a model using K- Nearest Neighbor using k=1
+
+attach(Weekly_train)
+train.X= cbind(Lag1,Lag2)
+train.Direction= Weekly_train$Direction
+attach(Weekly_test)
+test.X= cbind(Lag1,Lag2)
+
+
+
+knn.pred= knn(train=train.X,test=test.X, cl=train.Direction, k=1)
+
+# Calculating the Accuracy
+# Accuracy is 0.4807692
+mean(knn.pred==Weekly_test$Direction)
+
+
+
+## Fitting a model using K- Nearest Neighbor using k=2
+# Calculating the Accuracy
+# Accuracy is 0.4615385
+knn.pred= knn(train=train.X,test=test.X, cl=train.Direction, k=2)
+mean(knn.pred==Weekly_test$Direction)
+
+
+
+
+
+## Fitting a model using K- Nearest Neighbor using k=3
+knn.pred= knn(train=train.X,test=test.X, cl=train.Direction, k=3)
+# Calculating the Accuracy
+# Accuracy is 0.5192308
+mean(knn.pred==Weekly_test$Direction)
+
+```
+
+
+## 7. Which of these methods in Parts 3, 4, 5, and 6 appears to provide the best results on this data?
+
+
+- Logistic Regression Model gives Accuracy=  0.5769231
+- Linear Discriminant Analysis also gives Accuracy= 0.5769231
+- Quadratic Discriminant Analysis gives Accuracy= 0.5576923
+- KNN with K=1 gives Accuracy=0.4807692
+- KNN with K=2 gives Accuracy=0.4615385
+- KNN with K=3 gives Accuracy=0.5192308
+
+- Among all of these different techniques, Logistic Regression and Linear Discriminant Analysis gave the highest Accuracy
+
+
+```{r}
+
+# Logistic Regression Model gives Accuracy=  0.5769231
+# Linear Discriminant Analysis also gives Accuracy= 0.5769231
+# Quadratic Discriminant Analysis gives Accuracy= 0.5576923
+# KNN with K=1 gives Accuracy=0.4807692
+# KNN with K=2 gives Accuracy=0.4615385
+# KNN with K=3 gives Accuracy=0.5192308
+
+## Among all of these different techniques, Logistic Regression and Linear Discriminant Analysis gave the highest Accuracy
+
+```
+
+
+
+
+
+
+
+
+# Question 4
+
+## Write a function that works in R to gives you the parameters from a linear regression on a data set of $n$ predictors.  You can assume all the predictors and the prediction is numeric.  Include in the output the standard error of your variables.  You cannot use the lm command in this function or any of the other built in regression models.  
+
+
+![Least Square Method-1](/Users/metuhead/Desktop/FA590/HW2/SS/Screen Shot 2021-10-13 at 2.51.28 PM.png)
+
+![Least Square Method-2](/Users/metuhead/Desktop/FA590/HW2/SS/Screen Shot 2021-10-13 at 2.51.38 PM.png)
+
+
+
+
+
+![Least Square Method-3](/Users/metuhead/Desktop/FA590/HW2/SS/Screen Shot 2021-10-17 at 2.36.50 PM.png)
+
+
+
+
+
+![Least Square Method-4](/Users/metuhead/Desktop/FA590/HW2/SS/Screen Shot 2021-10-17 at 1.37.55 PM.png)
+
+- Created a linear regression function, note column number should be specified to select the  dependent variable
+
+```{r}
+# Creating a linear regression function, note column number should be specified to select the  dependent variable
+
+regress= function(dataset,col_num){
+  
+  Y= as.matrix(dataset[col_num])
+  X= as.matrix (dataset[-col_num])
+
+  # Adding 1s to the Matrix
+  X = cbind(rep(1,nrow(dataset)), X  )
+  
+  
+  a= t(X) %*% X
+  b=  t(X) %*% Y
+  a_inv= solve(a)
+  beta= a_inv %*% b
+  
+  
+  colnames(beta)= "coefficients"
+  
+  N=nrow(X)
+  p= ncol(X)
+  df= N-p-1
+  
+ # Calculating Standard Error of the coefficients
+  sig_sq=   1/(N-p)      *      sum((Y- X%*%beta ) ^2 )
+  SE= diag(sig_sq *a_inv)
+  SE= sqrt(SE)
+  
+  # Calcualting t-value
+  
+  result= cbind(beta, SE)
+  
+  result= data.frame(result)
+  result$t_value= result$coefficients/result$SE
+  
+  # Calculating p- value
+  
+  #2*pt(q=12.5785546,df= 5,lower.tail = F)
+  
+  #sapply(result$t_value, pt)
+  
+  return(result)
+  
+  
+}
+  
+```
+
+
+
+
+
+
+
+- Testing the function on  a dataset
+- Both lm function and own built function gives the same result
+
+```{r}
+
+library(readr)
+# Testing the regression function using data set from the URL below
+
+data_set <- read_delim("https://online.stat.psu.edu/stat462/sites/onlinecourses.science.psu.edu.stat462/files/data/soapsuds/index.txt",    "\t", escape_double = FALSE, trim_ws = TRUE)
+
+
+# Adding another variable to the dataset to make it multivariable data set
+data_set["soap_sq"] = data_set$soap^2
+#head(data_set)
+
+
+# Using lm function to create a regression model
+lm(suds~soap+soap_sq,data=data_set)
+
+# Using regress own built function to create a regression model, both gives the same result
+regress(data_set,col_num=2)
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
