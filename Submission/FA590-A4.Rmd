@@ -1,0 +1,653 @@
+---
+title: "A4"
+author: ' Muhammet Furkan Isik'
+output:
+  word_document: default
+  pdf_document: default
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(warning=FALSE, message=FALSE)
+```
+
+# Assignment #4.
+
+
+## `r format(Sys.time(), "%Y-%m-%d")`
+
+
+I pledge on my honor that I have not given or received any unauthorized assistance on this assignment/examination. I further pledge that I have not copied any material from a book, article, the Internet or any other source except where I have expressly cited the source.
+
+By filling out the following fields, you are signing this pledge.  No assignment will get credit without being pledged.
+
+Name:Muhammet Furkan Isik
+
+CWID:10472193
+
+Date: 12/11/2021
+
+
+# Instructions
+In this assignment, you should use R markdown to answer the questions below. Simply type your R code into embedded chunks as shown above.
+When you have completed the assignment, knit the document into a PDF file, and upload both the .pdf and .Rmd files to Canvas.
+```{r}
+CWID = -1 #Place here your Campus wide ID number, this will personalize
+#your results, but still maintain the reproduceable nature of using seeds.
+#If you ever need to reset the seed in this assignment, use this as your seed
+#Papers that use -1 as this CWID variable will earn 0's so make sure you change
+#this value before you submit your work.
+personal = CWID %% 10000
+set.seed(personal)#You can reset the seed at any time in your code,
+#but please always set it to this seed.
+```
+
+1 point for every item of every question. Total = 22. There is a final extra question (2 points).
+
+Pilgrim Bank.
+
+This exercise is based on the case Pilgrim Bank A (602104), Harvard Business School. In order to buy this case, you must register in the HBS website following this link:
+https://hbsp.harvard.edu/import/859412.
+
+You must read the case to understand the main problem proposed that would help you to answer the questions in the proper way.
+
+Using the dataset pilgrim.csv from the Pilgrim Bank case, please answer the following questions to evaluate the impact of the online channel and if its adoption requires pay a rebate or receive a fee from the customers.
+The dataset uses the following convention: variables xxx9 and xxx0 refer to 1999 and 2000 respectively. Observations of 2000 with missing observations are from customers that have already left the bank.
+
+You can answer most of the questions until 5.c. using linear regression (OLS). The program should be written in R.
+
+# 1. Calculate average customer profitability with 95% confidence level
+
+```{r}
+df <- read.csv("/Users/metuhead/Desktop/FA590/HW4/pilgrim.csv")
+df_1 <- na.omit(df)
+data=df_1
+
+```
+
+
+```{r}
+library(tidyr)
+p9 <- data$Profit9
+p9 <- p9[!is.na(p9)]
+p9.mean <- mean(p9)
+p9.std <- sd(p9)
+n1 <- length(p9)
+p0 <- data$Profit0
+p0 <- p0[!is.na(p0)]
+p0.mean <- mean(p0)
+p0.std <- sd(p0)
+n2 <- length(p0)
+t1 <- qt(p = 0.95,
+df = n1 - 1,
+lower.tail = T)
+t2 <- qt(p = 0.95,
+df = n2 - 1,
+lower.tail = T)
+conf_lvl <- function(n, mean, std, t) {
+u <- mean + (t * std / sqrt(n))
+l <- mean - (t * std / sqrt(n))
+return(c(l, u))
+}
+ul9 <- conf_lvl(n1, p9.mean, p9.std, t1)
+ul0 <- conf_lvl(n2, p0.mean, p0.std, t2)
+conf.table <- data.frame(ul9, ul0)
+rownames(conf.table) <- c('low', 'high')
+colnames(conf.table) <- c('1999', '2000')
+conf.table
+```
+
+
+
+
+
+
+
+
+# 2.a. Evaluate if online channel has a significant impact on 1999 profitability (Profit9).
+
+
+- According to t-test p value is 0.2254, then null hypothesis can not be rejected
+- Null hypothesis : Mean of group 1= mean of group 2
+- Hence, online channel usage is significant
+- Moreover, regression p value for Variable Online is 0.21 not significant
+
+```{r}
+t.test(data$Profit9 ~ data$Online9, mu=0, alt="two.sided", conf=0.95, var.eq=F, paired=F)
+
+summary(lm(Profit9~Online9, data=data))
+```
+
+
+
+
+- Descriptive Statistics
+
+```{r}
+par(mfrow=c(1,3))
+
+plot( data$Age9[data$Online9==1],data$Profit9[data$Online9==1],col=3, xlab= " Online=1 & Age ", ylab= "Profit")
+plot( data$Age9[data$Online9==0],data$Profit9[data$Online9==0],col=4 , xlab= " Online=0 & Age ", ylab= "Profit")
+
+boxplot(data$Profit9~data$Online9, col=3)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+# 2.b. Does age help to explain if online channel has a significant impact on 1999 profitability?
+
+- According to regression summary, yes Age hels to expalin that online channel has signifact impact since the p value is too small close to zero
+
+
+
+```{r}
+online_lm <- lm(Profit9~Age9+Online9, data = df_1)
+summary(online_lm)
+
+#Yes , Age and Online9 are impactful for profitability
+
+```
+
+# 3. To adjust for missing observations in the case of the variables Age9 and Inc9 (income) and adjust other variables: 
+	- Substitute missing observations with zeros: create variables Age0 and Inc0 
+	- Substitute missing observations with averages: create variables AgeAvg and IncAvg
+	- Include additional dummy variables where 1 if there is data and 0 otherwise: create variables AgeExist and IncExist (define as factor variable).
+	- Retain takes a value of 0 when Profit0 has a missing observation and 1 otherwise: create variable retainD (define as factor variable).
+	- Create dummy variables D1100 and D1200 for districts 1100 and 1200 respectively from the variable District9 (define as factor variables).
+	- Variables Online9, Billpay9, Online0, Billpay0 should be defined as factor variables.
+	
+To test for bias of missing data, evaluate if missing data has an effect on profitability analysis: 
+ 3a. Evaluate the effect of online channel on 1999 profits when Age0 is included.
+ 3b. Evaluate if adjusting missing data using Age0 or AgeAvg is relevant. In both cases, it is still necessary to include the additional variable  AgeExist to control for the missing data
+ 3c. Repeat above steps with income. Evaluate if adjusting missing data using Inc0 or IncAvg is relevant. 
+
+
+
+```{r}
+
+df$Age0 <- df$Age9
+df$Age0[is.na(df$Age0)] <- 0
+
+
+df$Inc0 <- df$Inc9
+df$Inc0[is.na(df$Inc0)] <- 0
+
+
+df$AgeAvg[is.na(df$Age9)]<-mean(df$Age9,na.rm=TRUE)
+
+
+df$AgeAvg <- df$Age9
+df$AgeAvg[is.na(df$Age9)]<-mean(df$Age9,na.rm=TRUE)
+
+
+df$IncAvg <- df$Inc9
+df$IncAvg[is.na(df$Inc9)]<-mean(df$Inc9,na.rm=TRUE)
+
+
+AgeExist <- ifelse(is.na(df$Age9),0,1)
+df$AgeExist <- as.factor(AgeExist)
+
+IncExist <- ifelse(is.na(df$Inc9),0,1)
+df$IncExist <- as.factor(IncExist)
+
+retainD <- ifelse(is.na(df$Profit0),0,1)
+df$retainD <- as.factor(retainD)
+
+D1100 <- ifelse(df$District9 == 1100,1,0)
+df$D1100 <- as.factor(D1100)
+
+D1200 <- ifelse(df$District9 == 1200,1,0)
+df$D1200 <- as.factor(D1200)
+
+fact_cols <- c("Online9","Billpay9","Online0","Billpay0")
+
+#df[fact_cols] <- as.factor(df[fact_cols])
+
+
+df[,fact_cols] <- lapply(df[,fact_cols], as.factor)
+
+```
+
+
+
+
+
+
+
+
+## 3a. Evaluate the effect of online channel on 1999 profits when Age0 is included
+
+
+- According to Regression summary, 
+- Model is  Profit9= 57+13.8 (Online9) + 17.7 (Age0) was obtained.
+- All the variables are signifacant since the p values quite close to 0
+- Age0 helps explaining  the effect of online channel on 1999 profits
+
+
+
+
+```{r}
+online_lm <- lm(Profit9~Age0+Online9, data = df)
+summary(online_lm)
+
+```
+
+
+
+
+
+
+## 3b. Evaluate if adjusting missing data using Age0 or AgeAvg is relevant. In both cases, it is still necessary to include the additional variable  AgeExist to control for the missing data
+
+
+- The coefficients are significantly not zero sincce p values are quite close to 0.
+- In comparison to model in 3a, a higher R-squared  was obtained. Hence, this model better explains the variation.
+- Equation of Profit9= 70.9+19.6 (Online9) + 25.6 (Age0) – 51.85(AgeExist) was obtained. 
+- When we just use Age0 and AgeExist, both are relevant to predict Profit
+- When we just use AgeAvg and AgeExist, both are relevant to predict Profit9
+
+
+
+```{r}
+
+Age0_lm <- lm(Profit9~Age0+AgeExist, data = df)
+summary(Age0_lm)
+
+AgeAvg_lm <- lm(Profit9~AgeAvg+AgeExist, data = df)
+summary(AgeAvg_lm)
+
+
+```
+
+
+
+
+## 3c. Repeat above steps with income. Evaluate if adjusting missing data using Inc0 or IncAvg is relevant. Include AgeExist and AgeAvg in the calculations.
+
+
+- When we include Inc0 and Online to predict Profit9, Online9 is not relevant due to higher p value
+- When we just use Inc0 and IncExist, both are relevant to predict Profit9
+- When we just use IncAvg and IncExist, both are relevant to predict Profit9
+
+
+```{r}
+
+onlineInc_lm <- lm(Profit9~Inc0+Online9, data = df)
+summary(onlineInc_lm)
+Inc0_lm <- lm(Profit9~Inc0+IncExist, data = df)
+summary(Inc0_lm)
+IncAvg_lm <- lm(Profit9~IncAvg+IncExist, data = df)
+summary(IncAvg_lm)
+
+
+```
+
+
+
+
+# 4.a. Evaluate if online channel has a significant impact on 1999 profitability after controlling for demographic variables: age, income, tenure, and geographic district. You can evaluate the impact of geographic district using the dummy variables D1100 and D1200.
+
+- The coefficients are significantly not zero.
+- The R-squared increases even more than the model in 3c 
+- We find that Online9 is  significant due to its p-value which is 0.00271
+
+
+```{r}
+dem_lm <- lm(Profit9~Online9+Age0+AgeExist+Inc0+IncExist+Tenure9+D1100+D1200, data = df)
+summary(dem_lm)
+
+
+```
+
+
+
+
+# 5.a. Evaluate the drivers of customer profitability for the year 2000 (Hint: you can evaluate the variables explored for profitability of 1999).
+
+- Except from district demographics and Age0, everything is useful to predict profit0
+
+```{r}
+
+
+#Due to NA values in Profit0 we impute the median values
+
+summary(df$Profit0)
+
+#Median is 23.0; we don't choose mean because it is right skewed
+
+
+df$Profit0[is.na(df$Profit0)] <- 23.0
+
+
+profit0_lm <- lm(Profit0~Online9+Tenure9+Age0+AgeAvg+IncAvg+Inc0+D1100+D1200, data = df)
+summary(profit0_lm)
+
+
+```
+
+#5.b. Evaluate if the variable Profit9 should be included in the customer profitability analysis for 2000.
+
+
+- Adding Profit 9, increases the Adjusted R-squared value dramatically from 0.03417 to  0.3613. Therefore, it should definitely be added to the model.  However, some of the variables become not statistically significant.
+
+- Hence, it's wise to create another model definitely including Profit9, and removing non-significant variables, which gives us Adjusted R-squared:  0.3614 value 
+
+
+
+```{r}
+profit0_9lm <- lm(Profit0~Profit9+Online9+AgeAvg+IncAvg+Tenure9+Age0+Inc0+D1100+D1200, data = df)
+summary(profit0_9lm)
+
+```
+
+
+
+
+
+
+# 5.c. Forecast customer profitability of the test sample for 2000 after adding electronic billpay and evaluate the most important variables using OLS.
+
+- According to summary, these are the statistically significant variables: retainD1, Tenure9 ,Age0 ,AgeExist1,Online01 ,Inc0     
+
+
+
+```{r}
+#Split the data in 2/3 training and 1/3 testing.
+
+#Train Test Split
+
+df$Online0[is.na(df$Online0)] <- 0
+df$Billpay0[is.na(df$Billpay0)] <- 0
+
+train = df[1:21099,]
+test = df[21100:31634,]
+
+#Online0 has NA values, changing these to 0;
+
+profit0_lm <- lm(Profit0~Online9+retainD+Tenure9+Age0+AgeExist+Online0+Inc0+IncExist+D1100+D1200, data = train)           
+summary(profit0_lm)
+profit0_testpreds <- predict(profit0_lm,test)
+lm_testmse <- mean((test$Profit0 - profit0_testpreds)^2)
+cat("Test MSE of Linear Regression is:", lm_testmse,'\n')
+```
+
+
+
+
+# 5.d. Forecast customer profitability of the test sample for 2000 after adding electronic billpay and evaluate the most important variables using any nonlinear machine learning algorithm.
+
+
+
+- According to variables importance plot, important variables are Tenure 9, Inc0, Age0, retain ID, Online 0
+
+```{r}
+
+library(randomForest)
+
+rf <- randomForest(Profit0~Online9+retainD+Tenure9+Age0+AgeExist+Online0+Inc0+IncExist+D1100+D1200, data = train,mtry=3,ntree=100)
+importance(rf)
+
+varImpPlot(rf)
+
+
+rf_pred <- predict(rf,test) 
+
+rf_mse <- mean((test$Profit0 - rf_pred)^2)
+cat("Test MSE for Random Forest:",rf_mse)
+
+```
+
+
+#5.e. Which one provides the best ranking for these variables? why?
+
+- Comparing these two models OLS and Random Forest, since OLS gives lower MSE, it's wise to say OLS provides better ranking for these variables
+
+
+
+# 5.f. Forecast customer profitability of the test sample for 2000 after adding electronic billpay using 1 layer neural network (NN).
+
+
+![Neural Networks](/Users/metuhead/Desktop/FA590/HW4/SS/Screen Shot 2021-12-07 at 9.55.46 AM.png){#id .class width=3000 height=2000px}
+
+
+
+
+
+
+
+```{r}
+library(neuralnet)
+
+
+cols_tonum <- c("retainD","Online9","Age0","AgeExist","Online0","Inc0","IncExist","D1100","D1200","Billpay0","Billpay9")
+train[,cols_tonum] <- lapply(train[,cols_tonum], as.numeric)
+test[,cols_tonum] <- lapply(test[,cols_tonum], as.numeric)
+
+nn = neuralnet(Profit0~Online9+retainD+Tenure9+Age0+AgeExist+Online0+Inc0+IncExist+D1100+D1200+Billpay0,data = train,hidden = 1, linear.output = F)
+
+
+nn1_preds <- compute(nn, test)
+nn1_mse <- mean((test$Profit0 - nn1_preds$net.result)^2)
+cat("Test MSE for NN with 1 layers:",nn1_mse)
+
+
+
+```
+
+
+
+
+
+
+
+# 5.g. Forecast customer profitability of the test sample for 2000 after adding electronic billpay using 2 layers neural network (NN).
+
+
+```{r}
+
+nn2 = neuralnet(Profit0~Online9+retainD+Tenure9+Age0+AgeExist+Online0+Inc0+IncExist+D1100+D1200+Billpay0,data = train,hidden =c(4,2), linear.output = F)
+
+
+nn2_preds <- compute(nn2, test)
+nn2_mse <- mean((test$Profit0 - nn2_preds$net.result)^2)
+cat("Test MSE for NN with 2 layers:",nn2_mse)
+
+```
+
+
+
+
+
+# 5.h. Build a table with the mean squared error (MSE) of these 4 methods. Discuss your results.
+
+
+- All the model gives quite high MSE results
+- According to the table, Linear Regression gives the lowest MSE value followed by Random Forest, and Neurelnet.
+- Since, Linear regression less computationally expensive and more interperatable it's wise to choose Linear regression among all those models.
+- Among non linear model, it's wise to choose random forrest since also  it's computationally less expensive and more explanory
+
+
+```{r}
+
+
+x = c(lm_testmse,rf_mse,nn1_mse,nn2_mse)
+y = c("Linear Regression","Random Forest","NN1","NN2")
+
+table_MSE <- data.frame(x,y)
+names(table_MSE) <- c("MSE","Model")
+table_MSE
+
+
+
+```
+
+
+
+
+Forecast customer retention for the year 2000 using the variables Online9, Billpay9, Online0, Billpay0 and the following algorithms:
+#6.a. Naive Bayes. Hint: use library(e1071)
+
+- NB is slightly better than NN and we prefer NB because it is much less complex thaa a NN 
+- Accuracy : 32.8%   1760+1696 / 10535
+
+```{r}
+library(e1071)
+
+nb <- naiveBayes(retainD~Online9+Billpay9+Online0+Billpay0, data = train)
+
+nb.results <- predict(nb,test)
+nbresultsdf <- data.frame(actual = test$retainD, prediction = nb.results)
+table(nbresultsdf$actual,nbresultsdf$prediction)
+
+
+
+```
+
+
+
+
+# 6.b  Neural networks
+
+- Accuracy =  32.017%     1579+1794 / 10535 
+
+```{r}
+
+nn_retainD <- neuralnet(retainD~Online9+Billpay9+Online0+Billpay0, data = train, hidden=c(1,3),linear.output=F,threshold=0.3)
+
+#Test the resulting output
+nn.results <- compute(nn_retainD, test)
+results <- data.frame(actual = test$retainD, prediction = ifelse(nn.results$net.result > 0.999999516907582,2,1))
+attach(results)
+table(actual,prediction)
+
+
+```
+
+
+
+# 6.c. Compare their accuracy and explain why one of these methods is more appropriate for this problem. 
+
+- NB is slightly better than NN and we prefer NB because it is much less complex than a NN 
+
+```{r}
+library(e1071)
+
+nn_retainD <- neuralnet(retainD~Online9+Billpay9+Online0+Billpay0, data = train, hidden=c(1,3),linear.output=F,threshold=0.3)
+
+#Test the resulting output
+nn.results <- compute(nn_retainD, test)
+results <- data.frame(actual = test$retainD, prediction = ifelse(nn.results$net.result > 0.999999516907582,2,1))
+attach(results)
+table(actual,prediction)
+#ACcuracy = 1579+1794 / 10535: 32.017%
+
+
+nb <- naiveBayes(retainD~Online9+Billpay9+Online0+Billpay0, data = train)
+
+nb.results <- predict(nb,test)
+nbresultsdf <- data.frame(actual = test$retainD, prediction = nb.results)
+table(nbresultsdf$actual,nbresultsdf$prediction)
+#Accuracy : 1760+1696 / 10535: 32.8%
+
+
+```
+
+# 7. Evaluate the effect of the online channel and billpay on customer's retention with the variables Online9, Billpay9, Online0, Billpay0 using neural networks. Hint: use the function garson from the package NeuralNetTools.
+
+- According the barplot, we can see that Online0 is the most important and followed by Billpa9, Online9, Billpay 0 
+
+```{r}
+library("NeuralNetTools")
+
+
+
+#nn_online <- neuralnet(retainD~Online9+Billpay9+Online0+Billpay0, data = train, hidden = c(1,3), linear.output = T)
+nn_online <- neuralnet(retainD~Online9+Billpay9+Online0+Billpay0, data = train,hidden=50,threshold=0.01, linear.output=F)
+
+garson(nn_online, bar_plot=T)
+
+
+```
+
+Nonprogramming question: You neither have to write a program nor make any direct calculations, only interpret the results of your previous calculations.
+# 8.a. Draw a Bayesian network that represents the main drivers of profitability for 2000 and customers' retention using the previous information. 
+
+
+```{r}
+
+
+library(bnlearn)
+
+Pilgrim3= df[, c("Billpay0", "Online9", "Billpay9","Online0","Age0","Inc0","AgeAvg","IncAvg")]
+
+
+bn_df = data.frame(Pilgrim3)
+
+res= hc(bn_df)
+
+plot(res)
+
+```
+
+
+
+
+
+
+# 8.b  Justify your Bayesian network and evaluate if the adoption of the online channel requires pay a rebate or receive a fee from the customers.
+
+- We see that Online and Billpay plays importan role, so definitely adoption of the online channel requires pay a rebate.
+
+
+
+Extra exercise (2 extra points). This is a completely optional exercise that requires the installation of the keras library following these instructions:
+https://web.stanford.edu/~hastie/ISLR2/keras-instructions.html
+
+# 9. Select 15 images of animals (such as dogs, cats, birds, farm animals, etc.). If the subject does not occupy a reasonable part of the image, then crop the image. Use a pretrained image classification CNN as in Lab 10.9.4 to predict the class of each of your images, and report the probabilities for the top five predicted classes for each image.
+
+```{r}
+write('RETICULATE_AUTOCONFIGURE=FALSE', file = "~/.Renviron", append = TRUE)
+write(sprintf('RETICULATE_MINICONDA_PATH=%s', normalizePath("/islr-miniconda", winslash = "/", mustWork = FALSE)),file = "/.Renviron", append = TRUE)
+
+Sys.setenv(RETICULATE_AUTOCONFIGURE='FALSE',RETICULATE_MINICONDA_PATH=normalizePath("~/islr-miniconda", winslash = "/", mustWork = FALSE))
+
+source(system.file("helpers", "install.R", package = "ISLR2"))
+
+install_miniconda()
+library(tensorflow)
+library(keras)
+library(reticulate)
+library(ISLR2)
+library()
+
+
+
+animal_dir <- "C:/Users/furkan/Desktop/590/project/590animalimagesa4"
+image_names <- list.files(animal_dir)
+num_images <- length(image_names)
+x <- array(dim = c(num_images, 224, 224, 3))
+for (i in 1:num_images) {
+  img_path <- paste(animal_dir, image_names[i], sep = "/")
+  img <- image_load(img_path, target_size = c(224, 224))
+  x[i,,, ] <- image_to_array(img)
+}
+x <- imagenet_preprocess_input(x)
+###
+model <- application_resnet50(weights = "imagenet")
+summary(model)
+###
+pred6 <- model %>% predict(x) %>%  imagenet_decode_predictions(top = 3)
+names(pred6) <- image_names
+print(pred6)
+
+```
+
